@@ -1,4 +1,4 @@
-import EventEmitter from "eventemitter3";
+// import EventEmitter from "eventemitter3";
 import clamp from "lodash.clamp";
 
 import styles from "../allotment.module.css";
@@ -308,7 +308,7 @@ interface SashDragState {
  * In between each pair of views there will be a {@link Sash} allowing the user
  * to resize the views, making sure the constraints are respected.
  */
-export class SplitView extends EventEmitter implements Disposable {
+export class SplitView extends EventTarget implements Disposable {
   public onDidChange: ((sizes: number[]) => void) | undefined;
 
   /**  This {@link SplitView}'s orientation. */
@@ -469,19 +469,19 @@ export class SplitView extends EventEmitter implements Disposable {
               current: e.currentX,
             });
 
-      sash.on("start", (event: BaseSashEvent) =>
-        this.onSashStart(sashEventMapper(event))
-      );
+      sash.addEventListener("start", <any>((event: CustomEvent<BaseSashEvent>) =>
+        this.onSashStart(sashEventMapper(event.detail))
+      ));
 
-      sash.on("change", (event: BaseSashEvent) =>
-        this.onSashChange(sashEventMapper(event))
-      );
+      sash.addEventListener("change", <any>((event: CustomEvent<BaseSashEvent>) =>
+        this.onSashChange(sashEventMapper(event.detail))
+      ));
 
-      sash.on("end", () =>
+      sash.addEventListener("end", () =>
         this.onSashEnd(this.sashItems.findIndex((item) => item.sash === sash))
       );
 
-      sash.on("reset", () => {
+      sash.addEventListener("reset", () => {
         const index = this.sashItems.findIndex((item) => item.sash === sash);
         const upIndexes = range(index, -1, -1);
         const downIndexes = range(index + 1, this.viewItems.length);
@@ -517,6 +517,10 @@ export class SplitView extends EventEmitter implements Disposable {
     if (!skipLayout && typeof size !== "number" && size.type === "distribute") {
       this.distributeViewSizes();
     }
+  }
+
+  private emit<T = any>(type: string, detail?: T) {
+    this.dispatchEvent(new CustomEvent<T>(type, { detail }))
   }
 
   /**

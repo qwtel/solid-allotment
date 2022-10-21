@@ -1,20 +1,11 @@
 import classNames from "classnames";
 import clamp from "lodash.clamp";
 import isEqual from "lodash.isequal";
-import React, {
-  forwardRef,
-  useCallback,
-  useEffect,
-  useImperativeHandle,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import useResizeObserver from "use-resize-observer";
+import { Component, Ref,children, createEffect, createMemo, createRenderEffect, createSignal, JSX, onMount, For } from "solid-js";
+import { createResizeObserver } from "@solid-primitives/resize-observer";
 
 import styles from "./allotment.module.css";
 import { isIOS } from "./helpers/platform";
-import useIsomorphicLayoutEffect from "./helpers/use-isomorphic-layout-effect";
 import { LayoutService } from "./layout-service";
 import { PaneView } from "./pane-view";
 import { Orientation, setGlobalSashSize } from "./sash";
@@ -25,8 +16,8 @@ import {
   SplitViewOptions,
 } from "./split-view";
 
-function isPane(item: React.ReactNode | typeof Pane): item is typeof Pane {
-  return (item as any).type.displayName === "Allotment.Pane";
+function isPane(item: HTMLElement) {
+  return item.dataset['pane'] != null;
 }
 
 function isPaneProps(props: AllotmentProps | PaneProps): props is PaneProps {
@@ -41,7 +32,7 @@ function isPaneProps(props: AllotmentProps | PaneProps): props is PaneProps {
 
 export interface CommonProps {
   /** Sets a className attribute on the outer component */
-  className?: string;
+  class?: string;
   /** Maximum size of each element */
   maxSize?: number;
   /** Minimum size of each element */
@@ -51,7 +42,9 @@ export interface CommonProps {
 }
 
 export type PaneProps = {
-  children: React.ReactNode;
+  ref: Ref<HTMLDivElement>,
+
+  children: JSX.Element;
   /**
    * Preferred size of this pane. Allotment will attempt to use this size when adding this pane (including on initial mount) as well as when a user double clicks a sash, or the `reset` method is called on the Allotment instance.
    * @remarks The size can either be a number or a string. If it is a number it will be interpreted as a number of pixels. If it is a string it should end in either "px" or "%". If it ends in "px" it will be interpreted as a number of pixels, e.g. "120px". If it ends in "%" it will be interpreted as a percentage of the size of the Allotment component, e.g. "50%".
@@ -69,22 +62,21 @@ export type PaneProps = {
 /**
  * Pane component.
  */
-export const Pane = forwardRef<HTMLDivElement, PaneProps>(
-  ({ className, children }: PaneProps, ref) => {
+export const Pane = (props: PaneProps) => {
     return (
       <div
-        ref={ref}
-        className={classNames(
+        ref={props.ref}
+        data-pane=""
+        class={classNames(
           "split-view-view",
           styles.splitViewView,
-          className
+          props.class
         )}
       >
-        {children}
+        {props.children}
       </div>
     );
   }
-);
 
 Pane.displayName = "Allotment.Pane";
 
@@ -94,7 +86,7 @@ export type AllotmentHandle = {
 };
 
 export type AllotmentProps = {
-  children: React.ReactNode;
+  children: JSX.Element;
   /** Initial size of each element */
   defaultSizes?: number[];
   /** Resize each view proportionally when resizing container */
@@ -119,122 +111,102 @@ export type AllotmentProps = {
 /**
  * React split-pane component.
  */
-const Allotment = forwardRef<AllotmentHandle, AllotmentProps>(
-  (
-    {
-      children,
-      className,
-      maxSize = Infinity,
-      minSize = 30,
-      proportionalLayout = true,
-      separator = true,
-      sizes,
-      defaultSizes = sizes,
-      snap = false,
-      vertical = false,
-      onChange,
-      onReset,
-      onVisibleChange,
-    },
-    ref
-  ) => {
-    const containerRef = useRef<HTMLDivElement>(null!);
-    const previousKeys = useRef<string[]>([]);
-    const splitViewPropsRef = useRef(new Map<React.Key, PaneProps>());
-    const splitViewRef = useRef<SplitView | null>(null);
-    const splitViewViewRef = useRef(new Map<React.Key, HTMLElement>());
-    const layoutService = useRef<LayoutService>(new LayoutService());
-    const views = useRef<PaneView[]>([]);
+const Allotment = (props: AllotmentProps) => {
+    let containerRef: HTMLDivElement;
+    let previousNodes: HTMLElement[] = [];
+    let splitViewPropsRef = new Map<Node, PaneProps>();
+    let splitViewRef: SplitView | null = null;
+    let splitViewViewRef = new Map<Node, HTMLElement>();
+    let layoutService = new LayoutService();
+    let views: PaneView[] = [];
 
-    const [dimensionsInitialized, setDimensionsInitialized] = useState(false);
+    const [dimensionsInitialized, setDimensionsInitialized] = createSignal(false);
 
-    if (process.env.NODE_ENV !== "production" && sizes) {
+    if (process.env.NODE_ENV !== "production" && props.sizes) {
       console.warn(
         `Prop sizes is deprecated. Please use defaultSizes instead.`
       );
     }
 
-    const childrenArray = useMemo(
-      () => React.Children.toArray(children).filter(React.isValidElement),
-      [children]
+    const resolved = children(() => props.children);
+    const childrenArray = createMemo(
+      () => resolved.toArray().filter(x => x instanceof HTMLElement) as HTMLElement[],
     );
 
-    const resizeToPreferredSize = useCallback((index: number): boolean => {
-      const view = views.current?.[index];
+    const resizeToPreferredSize = (index: number): boolean => {
+      const view = views?.[index];
 
       if (typeof view?.preferredSize !== "number") {
         return false;
       }
 
-      splitViewRef.current?.resizeView(index, Math.round(view.preferredSize));
+      splitViewRef?.resizeView(index, Math.round(view.preferredSize));
 
       return true;
-    }, []);
+    }
 
-    useImperativeHandle(ref, () => ({
-      reset: () => {
-        if (onReset) {
-          onReset();
-        } else {
-          splitViewRef.current?.distributeViewSizes();
+    // onMount(() => Object.assign(containerRef, {
+    //   reset: () => {
+    //     if (props.onReset) {
+    //       props.onReset();
+    //     } else {
+    //       splitViewRef?.distributeViewSizes();
 
-          for (let index = 0; index < views.current.length; index++) {
-            resizeToPreferredSize(index);
-          }
-        }
-      },
-      resize: (sizes) => {
-        splitViewRef.current?.resizeViews(sizes);
-      },
-    }));
+    //       for (let index = 0; index < views.length; index++) {
+    //         resizeToPreferredSize(index);
+    //       }
+    //     }
+    //   },
+    //   resize: (sizes: number[]) => {
+    //     splitViewRef?.resizeViews(sizes);
+    //   },
+    // }));
 
-    useIsomorphicLayoutEffect(() => {
+    onMount(() => {
       let initializeSizes = true;
 
       if (
-        defaultSizes &&
-        splitViewViewRef.current.size !== defaultSizes.length
+        props.defaultSizes &&
+        splitViewViewRef.size !== props.defaultSizes.length
       ) {
         initializeSizes = false;
 
         console.warn(
-          `Expected ${defaultSizes.length} children based on defaultSizes but found ${splitViewViewRef.current.size}`
+          `Expected ${props.defaultSizes.length} children based on defaultSizes but found ${splitViewViewRef.size}`
         );
       }
 
-      if (initializeSizes && defaultSizes) {
-        previousKeys.current = childrenArray.map(
-          (child) => child.key as string
-        );
+      if (initializeSizes && props.defaultSizes) {
+        // previousKeys = childrenArray().map(
+        //   (child) => child.key as string
+        // );
+        previousNodes = childrenArray();
       }
 
       const options: SplitViewOptions = {
-        orientation: vertical ? Orientation.Vertical : Orientation.Horizontal,
-        proportionalLayout,
+        orientation: props.vertical ? Orientation.Vertical : Orientation.Horizontal,
+        proportionalLayout: props.proportionalLayout,
         ...(initializeSizes &&
-          defaultSizes && {
+          props.defaultSizes && {
             descriptor: {
-              size: defaultSizes.reduce((a, b) => a + b, 0),
-              views: defaultSizes.map((size, index) => {
-                const props = splitViewPropsRef.current.get(
-                  previousKeys.current[index]
-                );
-
-                const view = new PaneView(layoutService.current, {
+              size: props.defaultSizes.reduce((a, b) => a + b, 0),
+              views: props.defaultSizes.map((size, index) => {
+                const svProps = splitViewPropsRef.get(previousNodes[index]);
+                const view = new PaneView(layoutService, {
                   element: document.createElement("div"),
-                  minimumSize: props?.minSize ?? minSize,
-                  maximumSize: props?.maxSize ?? maxSize,
-                  priority: props?.priority ?? LayoutPriority.Normal,
-                  ...(props?.preferredSize && {
-                    preferredSize: props?.preferredSize,
+                  minimumSize: svProps?.minSize ?? props.minSize,
+                  maximumSize: svProps?.maxSize ?? props.maxSize,
+                  priority: svProps?.priority ?? LayoutPriority.Normal,
+                  ...(svProps?.preferredSize && {
+                    preferredSize: svProps?.preferredSize,
                   }),
-                  snap: props?.snap ?? snap,
+                  snap: svProps?.snap ?? props.snap,
                 });
 
-                views.current.push(view);
+                views.push(view);
 
                 return {
-                  container: [...splitViewViewRef.current.values()][index],
+                  container: [...splitViewViewRef.values()][index],
                   size: size,
                   view: view,
                 };
@@ -243,24 +215,24 @@ const Allotment = forwardRef<AllotmentHandle, AllotmentProps>(
           }),
       };
 
-      splitViewRef.current = new SplitView(
-        containerRef.current,
+      splitViewRef = new SplitView(
+        containerRef,
         options,
-        onChange
+        props.onChange
       );
 
-      splitViewRef.current.on("sashchange", (_index: number) => {
-        if (onVisibleChange && splitViewRef.current) {
-          const keys = childrenArray.map((child) => child.key as string);
+      splitViewRef.addEventListener("sashchange", () => {
+        if (props.onVisibleChange && splitViewRef) {
+          const nodes = childrenArray();
 
-          for (let index = 0; index < keys.length; index++) {
-            const props = splitViewPropsRef.current.get(keys[index]);
+          for (let index = 0; index < nodes.length; index++) {
+            const paneProps = splitViewPropsRef.get(nodes[index]);
 
-            if (props?.visible !== undefined) {
-              if (props.visible !== splitViewRef.current.isViewVisible(index)) {
-                onVisibleChange(
+            if (paneProps?.visible !== undefined) {
+              if (paneProps.visible !== splitViewRef.isViewVisible(index)) {
+                props.onVisibleChange(
                   index,
-                  splitViewRef.current.isViewVisible(index)
+                  splitViewRef.isViewVisible(index)
                 );
               }
             }
@@ -268,9 +240,10 @@ const Allotment = forwardRef<AllotmentHandle, AllotmentProps>(
         }
       });
 
-      splitViewRef.current.on("sashreset", (index: number) => {
-        if (onReset) {
-          onReset();
+      splitViewRef.addEventListener("sashreset", ev => {
+        const index = (ev as CustomEvent<number>).detail;
+        if (props.onReset) {
+          props.onReset();
         } else {
           if (resizeToPreferredSize(index)) {
             return;
@@ -280,245 +253,239 @@ const Allotment = forwardRef<AllotmentHandle, AllotmentProps>(
             return;
           }
 
-          splitViewRef.current?.distributeViewSizes();
+          splitViewRef?.distributeViewSizes();
         }
       });
 
-      const that = splitViewRef.current;
+      const that = splitViewRef;
 
       return () => {
         that.dispose();
       };
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    });
 
     /**
      * Add, remove or update views as children change
      */
-    useIsomorphicLayoutEffect(() => {
-      if (dimensionsInitialized) {
-        const keys = childrenArray.map((child) => child.key as string);
-        const panes = [...previousKeys.current];
+     createRenderEffect(() => {
+      if (dimensionsInitialized()) {
+        const nodes = childrenArray();
+        const panes = [...previousNodes];
 
-        const enter = keys.filter((key) => !previousKeys.current.includes(key));
-        const update = keys.filter((key) => previousKeys.current.includes(key));
-        const exit = previousKeys.current.map((key) => !keys.includes(key));
+        const enter = nodes.filter(node => !previousNodes.includes(node));
+        const update = nodes.filter(node => previousNodes.includes(node));
+        const exit = previousNodes.map(node => !nodes.includes(node));
 
         for (let index = exit.length - 1; index >= 0; index--) {
           if (exit[index]) {
-            splitViewRef.current?.removeView(index);
+            splitViewRef?.removeView(index);
             panes.splice(index, 1);
-            views.current.splice(index, 1);
+            views.splice(index, 1);
           }
         }
 
-        for (const enterKey of enter) {
-          const props = splitViewPropsRef.current.get(enterKey);
+        for (const enterNode of enter) {
+          const svProps = splitViewPropsRef.get(enterNode);
 
-          const view = new PaneView(layoutService.current, {
+          const view = new PaneView(layoutService, {
             element: document.createElement("div"),
-            minimumSize: props?.minSize ?? minSize,
-            maximumSize: props?.maxSize ?? maxSize,
-            priority: props?.priority ?? LayoutPriority.Normal,
-            ...(props?.preferredSize && {
-              preferredSize: props?.preferredSize,
+            minimumSize: svProps?.minSize ?? props.minSize,
+            maximumSize: svProps?.maxSize ?? props.maxSize,
+            priority: svProps?.priority ?? LayoutPriority.Normal,
+            ...(svProps?.preferredSize && {
+              preferredSize: svProps?.preferredSize,
             }),
-            snap: props?.snap ?? snap,
+            snap: svProps?.snap ?? props.snap,
           });
 
-          splitViewRef.current?.addView(
-            splitViewViewRef.current.get(enterKey)!,
+          splitViewRef?.addView(
+            splitViewViewRef.get(enterNode)!,
             view,
             Sizing.Distribute,
-            keys.findIndex((key) => key === enterKey)
+            nodes.findIndex(node => node === enterNode)
           );
 
           panes.splice(
-            keys.findIndex((key) => key === enterKey),
+            nodes.findIndex(node => node === enterNode),
             0,
-            enterKey
+            enterNode
           );
 
-          views.current.splice(
-            keys.findIndex((key) => key === enterKey),
+          views.splice(
+            nodes.findIndex(node => node === enterNode),
             0,
             view
           );
         }
 
         // Move panes if order has changed
-        while (!isEqual(keys, panes)) {
-          for (const [i, key] of keys.entries()) {
-            const index = panes.findIndex((pane) => pane === key);
+        while (!isEqual(nodes, panes)) {
+          for (const [i, node] of nodes.entries()) {
+            const index = panes.findIndex((pane) => pane === node);
 
             if (index !== i) {
-              splitViewRef.current?.moveView(
-                splitViewViewRef.current.get(key) as HTMLElement,
+              splitViewRef?.moveView(
+                splitViewViewRef.get(node) as HTMLElement,
                 index,
                 i
               );
 
-              const tempKey = panes[index];
+              const tempNode = panes[index];
               panes.splice(index, 1);
-              panes.splice(i, 0, tempKey);
+              panes.splice(i, 0, tempNode);
 
               break;
             }
           }
         }
 
-        for (const enterKey of enter) {
-          const index = keys.findIndex((key) => key === enterKey);
+        for (const enterNode of enter) {
+          const index = nodes.findIndex(node => node === enterNode);
 
-          const preferredSize = views.current[index].preferredSize;
+          const preferredSize = views[index].preferredSize;
 
           if (preferredSize !== undefined) {
-            splitViewRef.current?.resizeView(index, preferredSize);
+            splitViewRef?.resizeView(index, preferredSize);
           }
         }
 
-        for (const updateKey of [...enter, ...update]) {
-          const props = splitViewPropsRef.current.get(updateKey);
-          const index = keys.findIndex((key) => key === updateKey);
+        for (const updateNode of [...enter, ...update]) {
+          const svProps = splitViewPropsRef.get(updateNode);
+          const index = nodes.findIndex(node => node === updateNode);
 
-          if (props && isPaneProps(props)) {
-            if (props.visible !== undefined) {
+          if (svProps && isPaneProps(svProps)) {
+            if (svProps.visible !== undefined) {
               if (
-                splitViewRef.current?.isViewVisible(index) !== props.visible
+                splitViewRef?.isViewVisible(index) !== svProps.visible
               ) {
-                splitViewRef.current?.setViewVisible(index, props.visible);
+                splitViewRef?.setViewVisible(index, svProps.visible);
               }
             }
           }
         }
 
-        for (const updateKey of update) {
-          const props = splitViewPropsRef.current.get(updateKey);
-          const index = keys.findIndex((key) => key === updateKey);
+        for (const updateNode of update) {
+          const svProps = splitViewPropsRef.get(updateNode);
+          const index = nodes.findIndex(node => node === updateNode);
 
-          if (props && isPaneProps(props)) {
+          if (svProps && isPaneProps(svProps)) {
             if (
-              props.preferredSize !== undefined &&
-              views.current[index].preferredSize !== props.preferredSize
+              svProps.preferredSize !== undefined &&
+              views[index].preferredSize !== svProps.preferredSize
             ) {
-              views.current[index].preferredSize = props.preferredSize;
+              views[index].preferredSize = svProps.preferredSize;
             }
 
             let sizeChanged = false;
 
             if (
-              props.minSize !== undefined &&
-              views.current[index].minimumSize !== props.minSize
+              svProps.minSize !== undefined &&
+              views[index].minimumSize !== svProps.minSize
             ) {
-              views.current[index].minimumSize = props.minSize;
+              views[index].minimumSize = svProps.minSize;
               sizeChanged = true;
             }
 
             if (
-              props.maxSize !== undefined &&
-              views.current[index].maximumSize !== props.maxSize
+              svProps.maxSize !== undefined &&
+              views[index].maximumSize !== svProps.maxSize
             ) {
-              views.current[index].maximumSize = props.maxSize;
+              views[index].maximumSize = svProps.maxSize;
               sizeChanged = true;
             }
 
             if (sizeChanged) {
-              splitViewRef.current?.layout();
+              splitViewRef?.layout();
             }
           }
         }
 
         if (enter.length > 0 || exit.length > 0) {
-          previousKeys.current = keys;
+          previousNodes = nodes;
         }
       }
-    }, [childrenArray, dimensionsInitialized, maxSize, minSize, snap]);
-
-    useEffect(() => {
-      if (splitViewRef.current) {
-        splitViewRef.current.onDidChange = onChange;
-      }
-    }, [onChange]);
-
-    useResizeObserver({
-      ref: containerRef,
-      onResize: ({ width, height }) => {
-        if (width && height) {
-          splitViewRef.current?.layout(vertical ? height : width);
-          layoutService.current.setSize(vertical ? height : width);
-          setDimensionsInitialized(true);
-        }
-      },
     });
 
-    useEffect(() => {
+    createEffect(() => {
+      if (splitViewRef) {
+        splitViewRef.onDidChange = props.onChange;
+      }
+    });
+
+    onMount(() => {
+      createResizeObserver(containerRef, ({ width, height }) => {
+        if (width && height) {
+          splitViewRef?.layout(props.vertical ? height : width);
+          layoutService.setSize(props.vertical ? height : width);
+          setDimensionsInitialized(true);
+        }
+      });
+    });
+
+    onMount(() => {
       if (isIOS) {
         setSashSize(20);
       }
-    }, []);
+    });
 
     return (
       <div
-        ref={containerRef}
-        className={classNames(
+        ref={containerRef!}
+        class={classNames(
           "split-view",
-          vertical ? "split-view-vertical" : "split-view-horizontal",
-          { "split-view-separator-border": separator },
+          props.vertical ? "split-view-vertical" : "split-view-horizontal",
+          { "split-view-separator-border": props.separator },
           styles.splitView,
-          vertical ? styles.vertical : styles.horizontal,
-          { [styles.separatorBorder]: separator },
-          className
+          props.vertical ? styles.vertical : styles.horizontal,
+          { [styles.separatorBorder]: props.separator },
+          props.class
         )}
       >
         <div
-          className={classNames(
+          class={classNames(
             "split-view-container",
             styles.splitViewContainer
           )}
         >
-          {React.Children.toArray(children).map((child) => {
-            if (!React.isValidElement(child)) {
-              return null;
-            }
+          <For each={childrenArray()} fallback={null}>
+            {(child) => {
+              const node = child;
 
-            // toArray flattens and converts nulls to non-null keys
-            const key = child.key!;
+              if (isPane(child)) {
+                throw Error("Not implemented")
+                // splitViewPropsRef.set(node, child.props);
 
-            if (isPane(child)) {
-              splitViewPropsRef.current.set(key, child.props);
-
-              return React.cloneElement(child as React.ReactElement, {
-                key: key,
-                ref: (el: HTMLElement | null) => {
-                  if (el) {
-                    splitViewViewRef.current.set(key, el);
-                  } else {
-                    splitViewViewRef.current.delete(key);
-                  }
-                },
-              });
-            } else {
-              return (
-                <Pane
-                  key={key}
-                  ref={(el: HTMLElement | null) => {
-                    if (el) {
-                      splitViewViewRef.current.set(key, el);
-                    } else {
-                      splitViewViewRef.current.delete(key);
-                    }
-                  }}
-                >
-                  {child}
-                </Pane>
-              );
-            }
-          })}
+                // return React.cloneElement(child as React.ReactElement, {
+                //   key: node,
+                //   ref: el => {
+                //     if (el) {
+                //       splitViewViewRef.set(node, el);
+                //     } else {
+                //       splitViewViewRef.delete(node);
+                //     }
+                //   },
+                // });
+              } else {
+                return (
+                  <Pane
+                    ref={(el: HTMLElement | null) => {
+                      if (el) {
+                        splitViewViewRef.set(node, el);
+                      } else {
+                        splitViewViewRef.delete(node);
+                      }
+                    }}
+                  >
+                    {child}
+                  </Pane>
+                );
+              }
+            }}
+          </For>
         </div>
       </div>
     );
   }
-);
 
 Allotment.displayName = "Allotment";
 
