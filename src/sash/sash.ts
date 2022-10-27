@@ -131,7 +131,7 @@ export class Sash extends EventTarget implements Disposable {
   constructor(
     container: HTMLElement,
     layoutProvider: VerticalSashLayoutProvider,
-    options: SashOptions
+    options: Omit<SashOptions, 'orientation'> & { orientation: Orientation.Vertical }
   );
 
   /**
@@ -144,7 +144,7 @@ export class Sash extends EventTarget implements Disposable {
   constructor(
     container: HTMLElement,
     layoutProvider: HorizontalSashLayoutProvider,
-    options: SashOptions
+    options: Omit<SashOptions, 'orientation'> & { orientation: Orientation.Horizontal }
   );
   constructor(
     container: HTMLElement,
@@ -302,7 +302,7 @@ export class Sash extends EventTarget implements Disposable {
       }
     }
   }
-
+  
   public dispose(): void {
     this.el.removeEventListener("pointerdown", this.onPointerStart);
     this.el.removeEventListener("dblclick", this.onPointerDoublePress);
@@ -311,4 +311,7 @@ export class Sash extends EventTarget implements Disposable {
 
     this.el.remove();
   }
+
+  // public addEventListener(type: 'start', callback: ((ev: CustomEvent<SashEvent>) => void)|null, options?: boolean | AddEventListenerOptions | undefined): void;
+
 }

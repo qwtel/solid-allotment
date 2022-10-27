@@ -499,10 +499,7 @@ export function setSashSize(sashSize: number) {
   const hoverSize = clamp(sashSize, 1, 8);
 
   document.documentElement.style.setProperty("--sash-size", size + "px");
-  document.documentElement.style.setProperty(
-    "--sash-hover-size",
-    hoverSize + "px"
-  );
+  document.documentElement.style.setProperty("--sash-hover-size", hoverSize + "px");
 
   setGlobalSashSize(size);
 }
