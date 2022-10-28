@@ -62,7 +62,8 @@ export interface SashLayoutProvider {}
 
 /** A vertical sash layout provider provides position and height for a sash. */
 export interface VerticalSashLayoutProvider extends SashLayoutProvider {
-  getVerticalSashLeft(sash: Sash): number;
+  getVerticalSashLeft?(sash: Sash): number;
+  getVerticalSashRight?(sash: Sash): number;
   getVerticalSashTop?(sash: Sash): number;
   getVerticalSashHeight?(sash: Sash): number;
 }
@@ -273,8 +274,13 @@ export class Sash extends EventTarget implements Disposable {
       const verticalProvider = this
         .layoutProvider as VerticalSashLayoutProvider;
 
-      this.el.style.left =
-        verticalProvider.getVerticalSashLeft(this) - this.size / 2 + "px";
+      if (verticalProvider.getVerticalSashRight) {
+        this.el.style.right =
+          verticalProvider.getVerticalSashRight(this) - this.size / 2 + "px";
+      } else if (verticalProvider.getVerticalSashLeft) {
+        this.el.style.left =
+          verticalProvider.getVerticalSashLeft(this) - this.size / 2 + "px";
+      }
 
       if (verticalProvider.getVerticalSashTop) {
         this.el.style.top = verticalProvider.getVerticalSashTop(this) + "px";

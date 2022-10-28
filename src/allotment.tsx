@@ -215,6 +215,7 @@ const Allotment = (props: AllotmentProps) => {
           }),
       };
 
+
       splitViewRef = new SplitView(
         containerRef,
         options,
