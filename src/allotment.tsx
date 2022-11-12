@@ -67,11 +67,11 @@ export const Pane = (props: PaneProps) => {
       <div
         ref={props.ref}
         data-pane=""
-        class={classNames(
+        class={[
           "split-view-view",
           styles.splitViewView,
           props.class
-        )}
+        ].join(" ")}
       >
         {props.children}
       </div>
@@ -432,21 +432,23 @@ const Allotment = (props: AllotmentProps) => {
     return (
       <div
         ref={containerRef!}
-        class={classNames(
-          "split-view",
-          props.vertical ? "split-view-vertical" : "split-view-horizontal",
-          { "split-view-separator-border": props.separator },
-          styles.splitView,
-          props.vertical ? styles.vertical : styles.horizontal,
-          { [styles.separatorBorder]: props.separator },
-          props.class
-        )}
+        classList={{
+          "split-view": true,
+          "split-view-vertical": props.vertical,
+          "split-view-horizontal": !props.vertical,
+          "split-view-separator-border": props.separator,
+          [styles.splitView]: true,
+          [styles.vertical]: props.vertical,
+          [styles.horizontal]: !props.vertical,
+          [styles.separatorBorder]: props.separator,
+          [props.class ?? ""]: !!props.class
+        }}
       >
         <div
-          class={classNames(
+          class={[
             "split-view-container",
             styles.splitViewContainer
-          )}
+          ].join(" ")}
         >
           <For each={childrenArray()} fallback={null}>
             {(child) => {
