@@ -217,17 +217,26 @@ export class Sash extends EventTarget implements Disposable {
 
     this.el.setPointerCapture(event.pointerId);
 
+    let moveEvent: SashEvent | undefined;
+
     const onPointerMove = (event: PointerEvent) => {
       event.preventDefault();
 
-      const moveEvent: SashEvent = {
+      const noMoveEvent = !moveEvent;
+
+      moveEvent = {
         startX,
         currentX: event.pageX,
         startY,
         currentY: event.pageY,
       };
 
-      this.emit("change", moveEvent);
+      noMoveEvent && requestAnimationFrame(() => {
+        if (moveEvent) {
+          this.emit("change", moveEvent)
+          moveEvent = undefined; 
+        }
+      });
     };
 
     const onPointerUp = (event: PointerEvent): void => {
