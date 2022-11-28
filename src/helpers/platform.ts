@@ -23,3 +23,4 @@ if (typeof navigator === "object") {
 
 export const isIOS = _isIOS;
 export const isMacintosh = _isMacintosh;
+export const isApple = _isIOS || _isMacintosh
