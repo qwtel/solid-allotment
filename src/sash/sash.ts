@@ -201,6 +201,10 @@ export class Sash extends EventTarget implements Disposable {
   }
 
   private onPointerStart = (event: PointerEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+
     const startX = event.pageX;
     const startY = event.pageY;
 
