@@ -1,5 +1,6 @@
 // import EventEmitter from "eventemitter3";
 import clamp from "lodash.clamp";
+import { TypedEventTarget } from "../../../typed-event-target";
 
 import styles from "../allotment.module.css";
 import { pushToEnd, pushToStart, range } from "../helpers/array";
@@ -308,7 +309,10 @@ interface SashDragState {
  * In between each pair of views there will be a {@link Sash} allowing the user
  * to resize the views, making sure the constraints are respected.
  */
-export class SplitView extends EventTarget implements Disposable {
+export class SplitView extends TypedEventTarget<{
+  sashreset: CustomEvent<number>,
+  sashchange: CustomEvent<number>,
+}> implements Disposable {
   public onDidChange: ((sizes: number[]) => void) | undefined;
 
   /**  This {@link SplitView}'s orientation. */
@@ -469,13 +473,13 @@ export class SplitView extends EventTarget implements Disposable {
               current: e.currentX,
             });
 
-      sash.addEventListener("start", <any>((event: CustomEvent<BaseSashEvent>) =>
+      sash.addEventListener("start", (event) =>
         this.onSashStart(sashEventMapper(event.detail))
-      ));
+      );
 
-      sash.addEventListener("change", <any>((event: CustomEvent<BaseSashEvent>) =>
+      sash.addEventListener("change", (event) =>
         this.onSashChange(sashEventMapper(event.detail))
-      ));
+      );
 
       sash.addEventListener("end", () =>
         this.onSashEnd(this.sashItems.findIndex((item) => item.sash === sash))

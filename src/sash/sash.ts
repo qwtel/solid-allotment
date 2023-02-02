@@ -1,5 +1,6 @@
 // import EventEmitter from "eventemitter3";
 import debounce from "lodash.debounce";
+import { TypedEventTarget } from "../../../typed-event-target";
 
 import { Disposable } from "../helpers/disposable";
 import { isIOS, isMacintosh } from "../helpers/platform";
@@ -51,7 +52,9 @@ export enum SashState {
 
 let globalSize = isIOS ? 20 : 8;
 
-const onDidChangeGlobalSize = new EventTarget();
+const onDidChangeGlobalSize = new TypedEventTarget<{ 
+  onDidChangeGlobalSize: CustomEvent<number>
+}>();
 
 export function setGlobalSashSize(size: number): void {
   globalSize = size;
@@ -81,7 +84,13 @@ export interface HorizontalSashLayoutProvider extends SashLayoutProvider {
  * hovered, becomes highlighted and can be dragged along the perpendicular dimension
  * to its direction.
  */
-export class Sash extends EventTarget implements Disposable {
+export class Sash extends TypedEventTarget<{
+  enablementChange: CustomEvent<SashState>
+  start: CustomEvent<SashEvent>
+  change: CustomEvent<SashEvent>
+  end: CustomEvent<void>
+  reset: CustomEvent<void>
+}> implements Disposable {
   private el: HTMLElement;
   private layoutProvider: SashLayoutProvider;
   private orientation!: Orientation;
@@ -180,7 +189,7 @@ export class Sash extends EventTarget implements Disposable {
       this.size = globalSize;
 
       onDidChangeGlobalSize.addEventListener("onDidChangeGlobalSize", ev => {
-        this.size = (<CustomEvent<number>>ev).detail;
+        this.size = ev.detail;
         this.layout();
       });
     }
@@ -330,7 +339,4 @@ export class Sash extends EventTarget implements Disposable {
 
     this.el.remove();
   }
-
-  // public addEventListener(type: 'start', callback: ((ev: CustomEvent<SashEvent>) => void)|null, options?: boolean | AddEventListenerOptions | undefined): void;
-
 }

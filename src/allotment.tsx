@@ -242,7 +242,7 @@ const Allotment = (props: AllotmentProps) => {
       });
 
       splitViewRef.addEventListener("sashreset", ev => {
-        const index = (ev as CustomEvent<number>).detail;
+        const index = ev.detail;
         if (props.onReset) {
           props.onReset();
         } else {
