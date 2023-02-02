@@ -1,6 +1,6 @@
 // import EventEmitter from "eventemitter3";
 import debounce from "lodash.debounce";
-import { TypedEventTarget } from "../../../typed-event-target";
+import { TypedEventTarget } from "vendor/typed-event-target";
 
 import { Disposable } from "../helpers/disposable";
 import { isIOS, isMacintosh } from "../helpers/platform";

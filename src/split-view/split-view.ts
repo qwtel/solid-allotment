@@ -1,6 +1,6 @@
 // import EventEmitter from "eventemitter3";
 import clamp from "lodash.clamp";
-import { TypedEventTarget } from "../../../typed-event-target";
+import { TypedEventTarget } from "vendor/typed-event-target";
 
 import styles from "../allotment.module.css";
 import { pushToEnd, pushToStart, range } from "../helpers/array";
