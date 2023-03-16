@@ -1,5 +1,6 @@
 let _isIOS = false;
 let _isMacintosh = false;
+let _isWebkit = false;
 let _userAgent: string | undefined = undefined;
 
 interface INavigator {
@@ -19,8 +20,10 @@ if (typeof navigator === "object") {
       _userAgent.indexOf("iPhone") >= 0) &&
     !!navigator.maxTouchPoints &&
     navigator.maxTouchPoints > 0;
+  _isWebkit = _userAgent.indexOf("WebKit") >= 0 && _userAgent.indexOf("Chrome") < 0;
 }
 
 export const isIOS = _isIOS;
 export const isMacintosh = _isMacintosh;
 export const isApple = _isIOS || _isMacintosh
+export const isWebkit = _isWebkit;
