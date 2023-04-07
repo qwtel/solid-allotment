@@ -210,6 +210,8 @@ export class Sash extends TypedEventTarget<{
   }
 
   private onPointerStart = (event: PointerEvent) => {
+    if (event.button !== 0) return;
+
     event.preventDefault();
     event.stopPropagation();
     event.stopImmediatePropagation();
