@@ -48,12 +48,12 @@ export interface PaneViewOptions {
 }
 
 export class PaneView implements View {
-  public minimumSize: number = 0;
-  public maximumSize: number = Number.POSITIVE_INFINITY;
+  private _minimumSize: number = 0;
+  private _maximumSize: number = Number.POSITIVE_INFINITY;
 
   readonly element: HTMLElement;
-  readonly priority?: LayoutPriority | undefined;
-  readonly snap: boolean;
+  private _priority?: LayoutPriority | undefined;
+  private _snap: boolean = false;
 
   private layoutService: LayoutService;
   private layoutStrategy: Layout;
@@ -91,17 +91,31 @@ export class PaneView implements View {
     }
   }
 
+  get priority() { return this._priority }
+  set priority(priority: LayoutPriority | undefined) {
+    this._priority = priority ?? LayoutPriority.Normal;
+  }
+  get snap() { return this._snap }
+  set snap(snap: boolean|undefined) {
+    this._snap = typeof snap === "boolean" ? snap : false;
+  }
+  get minimumSize(): number { return this._minimumSize }
+  set minimumSize(minimumSize: number|undefined) {
+      this._minimumSize = typeof minimumSize === "number" ? minimumSize : 30;
+  }
+  get maximumSize(): number { return this._maximumSize }
+  set maximumSize(maximumSize: number|undefined) {
+      this._maximumSize = typeof maximumSize === "number"
+        ? maximumSize
+        : Number.POSITIVE_INFINITY;
+  }
+
   constructor(layoutService: LayoutService, options: PaneViewOptions) {
     this.layoutService = layoutService;
     this.element = options.element;
 
-    this.minimumSize =
-      typeof options.minimumSize === "number" ? options.minimumSize : 30;
-
-    this.maximumSize =
-      typeof options.maximumSize === "number"
-        ? options.maximumSize
-        : Number.POSITIVE_INFINITY;
+    this.minimumSize = options.minimumSize;
+    this.maximumSize = options.maximumSize;
 
     if (typeof options.preferredSize === "number") {
       this.layoutStrategy = new PixelLayout(options.preferredSize);
@@ -130,9 +144,8 @@ export class PaneView implements View {
       this.layoutStrategy = new NullLayout();
     }
 
-    this.priority = options.priority ?? LayoutPriority.Normal;
-
-    this.snap = typeof options.snap === "boolean" ? options.snap : false;
+    this.priority = options.priority;
+    this.snap = options.snap;
   }
 
   layout(_size: number): void {}

@@ -15,6 +15,7 @@ import {
   SplitView,
   SplitViewOptions,
 } from "./split-view";
+import { effect } from "solid-js/web";
 
 function isPane(item: HTMLElement) {
   return item.dataset['pane'] != null;
@@ -215,7 +216,6 @@ const Allotment = (props: AllotmentProps) => {
           }),
       };
 
-
       splitViewRef = new SplitView(
         containerRef,
         options,
@@ -264,6 +264,14 @@ const Allotment = (props: AllotmentProps) => {
         that.dispose();
       };
     });
+
+    createRenderEffect(() => {
+      for (const view of views) {
+        view.minimumSize = props.minSize;
+        view.maximumSize = props.maxSize;
+        view.snap = props.snap;
+      }
+    })
 
     /**
      * Add, remove or update views as children change
@@ -433,10 +441,10 @@ const Allotment = (props: AllotmentProps) => {
       <div
         ref={containerRef!}
         classList={{
-          "split-view": true,
-          "split-view-vertical": props.vertical,
-          "split-view-horizontal": !props.vertical,
-          "split-view-separator-border": props.separator,
+          // "split-view": true,
+          // "split-view-vertical": props.vertical,
+          // "split-view-horizontal": !props.vertical,
+          // "split-view-separator-border": props.separator,
           [styles.splitView]: true,
           [styles.vertical]: props.vertical,
           [styles.horizontal]: !props.vertical,

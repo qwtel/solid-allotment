@@ -50,7 +50,7 @@ export enum SashState {
   Enabled = "ENABLED",
 }
 
-let globalSize = isIOS ? 20 : 8;
+let globalSize = isIOS ? 20 : 13;
 
 const onDidChangeGlobalSize = new TypedEventTarget<{ 
   onDidChangeGlobalSize: CustomEvent<number>
@@ -298,7 +298,7 @@ export class Sash extends TypedEventTarget<{
       const verticalProvider = this
         .layoutProvider as VerticalSashLayoutProvider;
 
-      if (verticalProvider.getVerticalSashRight) {
+      if (verticalProvider.getVerticalSashRight) { // XXX: added by me
         this.el.style.right =
           verticalProvider.getVerticalSashRight(this) - this.size / 2 + "px";
       } else if (verticalProvider.getVerticalSashLeft) {
