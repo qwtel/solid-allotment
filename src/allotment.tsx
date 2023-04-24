@@ -1,7 +1,7 @@
 import classNames from "classnames";
 import clamp from "lodash.clamp";
 import isEqual from "lodash.isequal";
-import { Component, Ref,children, createEffect, createMemo, createRenderEffect, createSignal, JSX, onMount, For } from "solid-js";
+import { Component, Ref,children, createEffect, createMemo, createRenderEffect, createSignal, JSX, onMount, For, on } from "solid-js";
 import { createResizeObserver } from "@solid-primitives/resize-observer";
 
 import styles from "./allotment.module.css";
@@ -265,13 +265,17 @@ const Allotment = (props: AllotmentProps) => {
       };
     });
 
-    createRenderEffect(() => {
+    createRenderEffect(on(() => ({
+      minSize: props.minSize,
+      maxSize: props.maxSize,
+      snap: props.snap,
+    }), (props) => {
       for (const view of views) {
         view.minimumSize = props.minSize;
         view.maximumSize = props.maxSize;
         view.snap = props.snap;
       }
-    })
+    }));
 
     /**
      * Add, remove or update views as children change
